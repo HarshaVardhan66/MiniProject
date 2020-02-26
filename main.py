@@ -4,14 +4,15 @@ from flask import *
 import pandas as pd
 import numpy as np
 from sklearn import linear_model
+from sklearn.model_selection import train_test_split
 
 app = Flask('__main__')
 
 
-def linearRegression(fit_data, test_data):
+def linearRegression(X_train, y_train, year):
     reg = linear_model.LinearRegression()
-    reg.fit(fit_data[['Date']], fit_data.Temp)
-    value = float(reg.predict([[int(request.form['year'])]]))
+    reg.fit(X_train, y_train)
+    value = float(reg.predict([[year]]))
     return value
 
 
@@ -52,6 +53,7 @@ def showResult():
     temps = list(data['AverageTemperature'])
     dates = list(data['dt'])
     year = int(start)
+
     # getting required average temperatures to plot the appropriate graph
     data_dict = {}
     for i in range(dates.index(start + '-01-01'), dates.index(end + '-12-01'), 12):
@@ -71,13 +73,18 @@ def showResult():
 
     # saving the graph data into the file
     plt.show()
-    return '<title>Result</title><Center><h1>Result in New Window</h1><a href="http://localhost:5000/show">Try ' \
+    return '<title>Result</title><Center><a href="http://localhost:5000/show">Try ' \
            'Again</a><br><br><a href="http://localhost:5000/">Home</a> '
 
 
 @app.route('/predict')
 def predict():
     return render_template('predict.html')
+
+
+@app.route('/predict_header')
+def predict_header():
+    return render_template('predict_header.html')
 
 
 @app.route('/predict_temp', methods=['POST'])
@@ -104,7 +111,7 @@ def predict_temp():
 
     # Extracting Fitting data
     start = '1900'
-    end = '1950'
+    end = '2000'
     year = int(start)
     data_dict = {'Date': [], 'Temp': []}
     for i in range(dates.index(start + '-01-01'), dates.index(end + '-12-01'), 12):
@@ -115,25 +122,16 @@ def predict_temp():
         data_dict['Date'].append(year)
         data_dict['Temp'].append(add)
         year = year + 1
-    fit_data = pd.DataFrame.from_dict(data_dict)
-
-    # Extracting Testing data
-    start = '1951'
-    end = '2012'
-    year = int(start)
-    data_dict = {'Date': [], 'Temp': []}
-    for i in range(dates.index(start + '-01-01'), dates.index(end + '-12-01'), 12):
-        add = 0
-        for j in range(0, 12):
-            add = add + float(temps[i + j])
-        add = add / 12
-        data_dict['Date'].append(year)
-        data_dict['Temp'].append(add)
-        year = year + 1
-    test_data = pd.DataFrame.from_dict(data_dict)
-
-    value = linearRegression(fit_data, test_data)
-    return "<center>Value is : " + str(value)[:5]
+    full_data = pd.DataFrame.from_dict(data_dict)
+    X = full_data[['Date']]
+    y = full_data.Temp
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=0)
+    year = int(request.form['year'])
+    if request.form['method'] == 'linear':
+        value = linearRegression(X_train, y_train, year)
+    else:
+        value = 0
+    return "<center>Value is : " + str(value)
 
 
 if __name__ == '__main__':

@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script type="text/javascript">
+        function blankFrame( )
+        {
+               return "<html><body></body></html>";
+        }
+    </script>
     <title>Predict</title>
+    <frameset rows="40%,*">
+        <frame name="head" src="http://localhost:5000/predict_header">
+        <frame name="body" src="javascript:parent.blankFrame()">
+    </frameset>
 </head>
-<body>
-<center>
-    <form action="http://localhost:5000/predict_temp" method="post">
-        <br><br>
-        Enter City name : <input type="text" name="city"> <br><br>
-        Enter Year : <input type="text" name="year"><br><br>
-        <input type="submit" value="Submit">
-    </form>
-</center>
-</body>
 </html>

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Predict</title>
+</head>
+<body>
+<center>
+    <form action="http://localhost:5000/predict_temp" target="body" method="post">
+        <br><br>
+        Enter City name : <input type="text" name="city"> <br><br>
+        Enter Year : <input type="text" name="year"><br><br>
+        <p><input type="radio" name="method" value="linear">Linear Regression
+		<input type="radio" name="method" value="ar">AutoRegression
+	    </p>
+        <input type="submit" value="Submit">
+    </form>
+</center>
+</body>
+</html>

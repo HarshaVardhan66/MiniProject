@@ -3,17 +3,34 @@ from pandas import *
 from flask import *
 import pandas as pd
 import numpy as np
-from sklearn import linear_model
 from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from statsmodels.tsa.ar_model import AR
+import os
 
 app = Flask('__main__')
 
 
-def linearRegression(X_train, y_train, year):
-    reg = linear_model.LinearRegression()
-    reg.fit(X_train, y_train)
-    value = float(reg.predict([[year]]))
-    return value
+def linear_regression(full_data, value) :
+    X = full_data[['Date']]
+    y = full_data.Temp
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=0)
+    lin_reg = LinearRegression()
+    lin_reg.fit(X_train, y_train)
+    result = lin_reg.predict([[value]])
+    return result
+
+
+def AutoRegression(series, value):
+    X = series.values
+    for i in range(2001, value+1) :
+        model = AR(X)
+        model_fit = model.fit()
+        y = model_fit.predict(len(X),len(X))
+        X = list(X)
+        X.append(y)
+        X = np.asarray(X)
+    return X[len(X)-1]
 
 
 @app.route('/')
@@ -90,7 +107,7 @@ def predict_header():
 @app.route('/predict_temp', methods=['POST'])
 def predict_temp():
     # Getting the required Data
-    data = pd.read_csv('D:\Harsha\Python\MiniProject\Data\Cities-Filtered.csv')
+    data = pd.read_csv(r'D:\Harsha\Python\MiniProject\Data\Cities-Filtered.csv')
     name = request.form['city']
     name = name.capitalize()
     if name == 'Chennai':
@@ -98,8 +115,7 @@ def predict_temp():
     if name == 'Mumbai':
         name = 'Bombay'
     city = [name]
-    if name not in set(data.City):
-        return "<h1><Center>No such city Found"
+
     data = data[data['City'].isin(city)]
     data = data[['dt', 'AverageTemperature']]
     data = data.reset_index(drop=True)
@@ -110,7 +126,7 @@ def predict_temp():
     temps = list(data['Temp'])
 
     # Extracting Fitting data
-    start = '1900'
+    start = '1901'
     end = '2000'
     year = int(start)
     data_dict = {'Date': [], 'Temp': []}
@@ -123,15 +139,17 @@ def predict_temp():
         data_dict['Temp'].append(add)
         year = year + 1
     full_data = pd.DataFrame.from_dict(data_dict)
-    X = full_data[['Date']]
-    y = full_data.Temp
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=0)
+
     year = int(request.form['year'])
+
     if request.form['method'] == 'linear':
-        value = linearRegression(X_train, y_train, year)
-    else:
-        value = 0
-    return "<center>Value is : " + str(value)
+        value = linear_regression(full_data, year)
+    elif request.form['method'] == 'ar':
+        full_data.to_csv('rough.csv', index=0)
+        series = read_csv('rough.csv', index_col=0)
+        os.remove('rough.csv')
+        value = AutoRegression(series, year)
+    return "<center>Value is : " + str(value)[1:7]
 
 
 if __name__ == '__main__':

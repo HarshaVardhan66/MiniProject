@@ -1,3 +1,4 @@
+
 import matplotlib.pyplot as plt
 from pandas import *
 from flask import *
@@ -6,12 +7,13 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from statsmodels.tsa.ar_model import AR
+from statsmodels.tsa.arima_model import ARIMA
 import os
 
 app = Flask('__main__')
 
 
-def linear_regression(full_data, value) :
+def linear_regression(full_data, value):
     X = full_data[['Date']]
     y = full_data.Temp
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=0)
@@ -23,14 +25,40 @@ def linear_regression(full_data, value) :
 
 def AutoRegression(series, value):
     X = series.values
-    for i in range(2001, value+1) :
+    for i in range(2001, value+1):
         model = AR(X)
         model_fit = model.fit()
-        y = model_fit.predict(len(X),len(X))
+        y = model_fit.predict(len(X), len(X))
         X = list(X)
         X.append(y)
         X = np.asarray(X)
     return X[len(X)-1]
+
+
+def difference(dataset, interval=1):
+    diff = list()
+    for i in range(interval, len(dataset)):
+        value = dataset[i] - dataset[i - interval]
+        diff.append(value)
+    return np.array(diff)
+
+
+def inverse_difference(history, i, interval=1):
+    return i + history[-interval]
+
+
+def ARIMA_model(full_data, year):
+    x = full_data.Temp.values
+    dif = difference(x, 1)
+    model = ARIMA(dif, order=(7, 0, 7))
+    model_fit = model.fit(disp=0)
+    forecast = model_fit.forecast(steps=abs(year-2012))[0]
+    history = [i for i in x]
+    value = 0
+    for i in forecast:
+        value = inverse_difference(history, i, 1)
+        history.append(value)
+    return value
 
 
 @app.route('/')
@@ -43,10 +71,10 @@ def show():
     return render_template('show.html')
 
 
-@app.route('/showResult', methods=['POST'])
+@app.route('/show_result', methods=['POST'])
 def showResult():
     # uploading data from csv file
-    data = read_csv('D:/Harsha/Python/MiniProject/Data/Cities-Filtered.csv')
+    data = read_csv('D:/Harsha/Python/FullMiniProject/Data/Cities-Filtered.csv')
 
     # requesting city name from form and checking its presence
     name = request.form['place']
@@ -56,8 +84,6 @@ def showResult():
     if name == 'Mumbai':
         name = 'Bombay'
     city = [name]
-    if name not in set(data.City):
-        return "<h1><Center>No such city Found"
 
     # after finding city in data, listing out the dates excluding 2013
     data = data[data.City.isin(city)]
@@ -90,8 +116,7 @@ def showResult():
 
     # saving the graph data into the file
     plt.show()
-    return '<title>Result</title><Center><a href="http://localhost:5000/show">Try ' \
-           'Again</a><br><br><a href="http://localhost:5000/">Home</a> '
+    return render_template('show.html')
 
 
 @app.route('/predict')
@@ -107,7 +132,7 @@ def predict_header():
 @app.route('/predict_temp', methods=['POST'])
 def predict_temp():
     # Getting the required Data
-    data = pd.read_csv(r'D:\Harsha\Python\MiniProject\Data\Cities-Filtered.csv')
+    data = pd.read_csv('D:/Harsha/Python/FullMiniProject/Data/Cities-Filtered.csv')
     name = request.form['city']
     name = name.capitalize()
     if name == 'Chennai':
@@ -141,15 +166,18 @@ def predict_temp():
     full_data = pd.DataFrame.from_dict(data_dict)
 
     year = int(request.form['year'])
-
-    if request.form['method'] == 'linear':
+    value = 0
+    if request.form['method'] == 'Linear Regression':
         value = linear_regression(full_data, year)
-    elif request.form['method'] == 'ar':
+    elif request.form['method'] == 'Auto Regression':
         full_data.to_csv('rough.csv', index=0)
         series = read_csv('rough.csv', index_col=0)
         os.remove('rough.csv')
         value = AutoRegression(series, year)
-    return "<center>Value is : " + str(value)[1:7]
+    elif request.form['method'] == 'Arima model':
+        value = ARIMA_model(full_data, year)
+        value = ' '+str(value)
+    return render_template('predict_result.html', Value=str(value)[1:7])
 
 
 if __name__ == '__main__':

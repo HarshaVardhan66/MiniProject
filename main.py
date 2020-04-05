@@ -1,13 +1,12 @@
-
 import matplotlib.pyplot as plt
-from pandas import *
-from flask import *
-import pandas as pd
+from pandas import read_csv, DataFrame
+from flask import Flask, render_template, request
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from statsmodels.tsa.ar_model import AR
 from statsmodels.tsa.arima_model import ARIMA
+from sklearn.metrics import mean_squared_error
 import os
 
 app = Flask('__main__')
@@ -25,14 +24,48 @@ def linear_regression(full_data, value):
 
 def AutoRegression(series, value):
     X = series.values
-    for i in range(2001, value+1):
+    for i in range(2001, value + 1):
         model = AR(X)
         model_fit = model.fit()
         y = model_fit.predict(len(X), len(X))
         X = list(X)
         X.append(y)
         X = np.asarray(X)
-    return X[len(X)-1]
+    return X[len(X) - 1]
+
+
+def evaluate_arima_model(X, arima_order):
+    train_size = int(len(X) * 0.66)
+    train, test = X[0:train_size], X[train_size:]
+    history = [x for x in train]
+    predictions = list()
+    for t in range(len(test)):
+        model = ARIMA(history, order=arima_order)
+        model_fit = model.fit(disp=0)
+        yhat = model_fit.forecast()[0]
+        predictions.append(yhat)
+        history.append(test[t])
+    error = mean_squared_error(test, predictions)
+    return error
+
+
+def evaluate_order(dataset):
+    dataset = dataset.astype('float32')
+    p_values = range(0, 12)
+    d_values = range(0, 5)
+    q_values = range(0, 12)
+    best_score, best_cfg = float("inf"), (7, 0, 1)
+    for p in p_values:
+        for d in d_values:
+            for q in q_values:
+                order = (p, d, q)
+                try:
+                    mse = evaluate_arima_model(dataset, order)
+                    if mse < best_score:
+                        best_score, best_cfg = mse, order
+                except:
+                    continue
+    return best_cfg
 
 
 def difference(dataset, interval=1):
@@ -50,9 +83,11 @@ def inverse_difference(history, i, interval=1):
 def ARIMA_model(full_data, year):
     x = full_data.Temp.values
     dif = difference(x, 1)
-    model = ARIMA(dif, order=(7, 0, 7))
+
+    arima_order = evaluate_order(full_data)
+    model = ARIMA(dif, order=arima_order)
     model_fit = model.fit(disp=0)
-    forecast = model_fit.forecast(steps=abs(year-2012))[0]
+    forecast = model_fit.forecast(steps=abs(year - 2012))[0]
     history = [i for i in x]
     value = 0
     for i in forecast:
@@ -103,7 +138,7 @@ def showResult():
         add = 0
         for j in range(0, 12):
             add = add + float(temps[i + j])
-        add = add/12
+        add = add / 12
         data_dict[year] = add
         year = year + 1
 
@@ -124,15 +159,10 @@ def predict():
     return render_template('predict.html')
 
 
-@app.route('/predict_header')
-def predict_header():
-    return render_template('predict_header.html')
-
-
 @app.route('/predict_temp', methods=['POST'])
 def predict_temp():
     # Getting the required Data
-    data = pd.read_csv('D:/Harsha/Python/FullMiniProject/Data/Cities-Filtered.csv')
+    data = read_csv('D:/Harsha/Python/FullMiniProject/Data/Cities-Filtered.csv')
     name = request.form['city']
     name = name.capitalize()
     if name == 'Chennai':
@@ -163,7 +193,7 @@ def predict_temp():
         data_dict['Date'].append(year)
         data_dict['Temp'].append(add)
         year = year + 1
-    full_data = pd.DataFrame.from_dict(data_dict)
+    full_data = DataFrame.from_dict(data_dict)
 
     year = int(request.form['year'])
     value = 0
@@ -176,7 +206,7 @@ def predict_temp():
         value = AutoRegression(series, year)
     elif request.form['method'] == 'Arima model':
         value = ARIMA_model(full_data, year)
-        value = ' '+str(value)
+        value = ' ' + str(value)
     return render_template('predict_result.html', Value=str(value)[1:7])
 
 

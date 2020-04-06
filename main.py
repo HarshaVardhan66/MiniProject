@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 from pandas import read_csv, DataFrame
 from flask import Flask, render_template, request
 import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from statsmodels.tsa.ar_model import AR
 from statsmodels.tsa.arima_model import ARIMA
@@ -13,17 +12,35 @@ app = Flask('__main__')
 
 
 def linear_regression(full_data, value):
-    X = full_data[['Date']]
-    y = full_data.Temp
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=0)
+    if os.path.exists("D:/Harsha/Python/FullMiniProject/static/figure.png"):
+        os.remove("D:/Harsha/Python/FullMiniProject/static/figure.png")
+    dates = full_data[['Date']]
+    temperatures = full_data['Temp']
     lin_reg = LinearRegression()
-    lin_reg.fit(X_train, y_train)
+    lin_reg.fit(dates, temperatures)
     result = lin_reg.predict([[value]])
+
+    years = range(1970, 2050 + 1)
+    values = []
+    for i in range(1970, 2050 + 1):
+        values.append([i])
+    predictions = lin_reg.predict(values)
+    plt.plot(full_data['Date'][70:], full_data['Temp'][70:], label="Actual Temperatures")
+    plt.plot(years, predictions, label="Predicted Temperatures")
+    plt.scatter(full_data['Date'][70:], full_data['Temp'][70:])
+    plt.xlabel('Temperatures')
+    plt.ylabel('Years')
+    plt.title('Temperature Prediction')
+    plt.legend()
+    plt.savefig("D:/Harsha/Python/FullMiniProject/static/figure.png")
     return result
 
 
 def AutoRegression(series, value):
+    if os.path.exists("D:/Harsha/Python/FullMiniProject/static/figure.png"):
+        os.remove("D:/Harsha/Python/FullMiniProject/static/figure.png")
     X = series.values
+    Xlen = len(X)
     for i in range(2001, value + 1):
         model = AR(X)
         model_fit = model.fit()
@@ -31,7 +48,29 @@ def AutoRegression(series, value):
         X = list(X)
         X.append(y)
         X = np.asarray(X)
-    return X[len(X) - 1]
+    result = X[len(X) - 1]
+    plt.plot(list(range(1970, 2000)), X[70:Xlen], label="Actual Temperatures")
+    plt.scatter(list(range(1970, 2000)), X[70:Xlen])
+
+    if value <= 2050:
+        for i in range(value+1, 2050+1):
+            model = AR(X)
+            model_fit = model.fit()
+            y = model_fit.predict(len(X), len(X))
+            X = list(X)
+            X.append(y)
+            X = np.asarray(X)
+
+    years = range(1999, 2050)
+    plt.plot(years, X[99:150], label="Predicted Temperatures")
+    plt.scatter(years, X[99:150])
+    plt.xlabel('Temperatures')
+    plt.ylabel('Years')
+    plt.title('Temperature Prediction')
+    plt.legend()
+    plt.savefig("D:/Harsha/Python/FullMiniProject/static/figure.png")
+
+    return result
 
 
 def evaluate_arima_model(X, arima_order):
@@ -81,19 +120,35 @@ def inverse_difference(history, i, interval=1):
 
 
 def ARIMA_model(full_data, year):
+    if os.path.exists("D:/Harsha/Python/FullMiniProject/static/figure.png"):
+        os.remove("D:/Harsha/Python/FullMiniProject/static/figure.png")
     x = full_data.Temp.values
     dif = difference(x, 1)
 
     arima_order = evaluate_order(full_data)
     model = ARIMA(dif, order=arima_order)
     model_fit = model.fit(disp=0)
-    forecast = model_fit.forecast(steps=abs(year - 2012))[0]
+    if year <= 2050:
+        forecast = model_fit.forecast(steps=50)[0]
+    else:
+        forecast = model_fit.forecast(steps=year-2000)[0]
     history = [i for i in x]
-    value = 0
     for i in forecast:
         value = inverse_difference(history, i, 1)
         history.append(value)
-    return value
+
+    plt.plot(list(range(1970, 2000)), full_data['Temp'][70:], label="Actual Temperatures")
+    plt.scatter(list(range(1970, 2000)), full_data['Temp'][70:])
+    years = range(1999, 2050)
+    plt.plot(years, history[99:150], label="Predicted Temperatures")
+    plt.scatter(years, history[99:150])
+    plt.xlabel('Temperatures')
+    plt.ylabel('Years')
+    plt.title('Temperature Prediction')
+    plt.legend()
+    plt.savefig("D:/Harsha/Python/FullMiniProject/static/figure.png")
+
+    return history[year-1900-1]
 
 
 @app.route('/')
